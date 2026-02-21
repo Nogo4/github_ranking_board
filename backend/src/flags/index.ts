@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia";
 import { authMiddleware } from "../middlewares/auth";
-import { FLAGS, FLAG_MAP, FLAG_BY_ANSWER } from "./config";
+import { FLAGS, FLAG_MAP } from "./config";
 import db from "../db";
 
 export const flagsPlugin = new Elysia({ prefix: "/flags" })
@@ -27,16 +27,21 @@ export const flagsPlugin = new Elysia({ prefix: "/flags" })
 
   .post(
     "/submit",
-    async ({ body: { flag }, userId, set }) => {
-      const match = FLAG_BY_ANSWER.get(flag.trim().toLowerCase());
+    async ({ body: { flagId, flag }, userId, set }) => {
+      const config = FLAG_MAP.get(flagId);
 
-      if (!match) {
+      if (!config) {
+        set.status = 404;
+        return { error: "Flag introuvable" };
+      }
+
+      if (flag.trim().toLowerCase() !== config.answer.toLowerCase()) {
         set.status = 400;
         return { error: "Flag incorrect" };
       }
 
       const already = await db.achivedFlag.findUnique({
-        where: { userId_flagId: { userId, flagId: match.id } },
+        where: { userId_flagId: { userId, flagId: config.id } },
       });
 
       if (already) {
@@ -46,23 +51,23 @@ export const flagsPlugin = new Elysia({ prefix: "/flags" })
 
       const [achivedFlag] = await db.$transaction([
         db.achivedFlag.create({
-          data: { userId, flagId: match.id },
+          data: { userId, flagId: config.id },
         }),
         db.user.update({
           where: { id: userId },
-          data: { score: { increment: match.points } },
+          data: { score: { increment: config.points } },
         }),
       ]);
 
       return {
-        message: `Flag "${match.name}" validé ! +${match.points} points`,
-        flagId: match.id,
-        flagName: match.name,
-        pointsEarned: match.points,
+        message: `Flag "${config.name}" validé ! +${config.points} points`,
+        flagId: config.id,
+        flagName: config.name,
+        pointsEarned: config.points,
         validatedAt: achivedFlag.date,
       };
     },
     {
-      body: t.Object({ flag: t.String() }),
+      body: t.Object({ flagId: t.String(), flag: t.String() }),
     },
   );
