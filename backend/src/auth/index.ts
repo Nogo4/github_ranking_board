@@ -33,7 +33,7 @@ export const authPlugin = new Elysia({ prefix: "/auth" })
 
   .get(
     "/callback",
-    async ({ query, cookie, jwt: jwtHandler, set }) => {
+    async ({ query, cookie, jwt: jwtHandler, set, redirect }) => {
       const { code, state } = query;
 
       const storedState = cookie[STATE_COOKIE].value;
@@ -79,7 +79,13 @@ export const authPlugin = new Elysia({ prefix: "/auth" })
         email: user.email,
       });
 
-      return { token, user };
+      const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:5173";
+      const params = new URLSearchParams({
+        token,
+        user: JSON.stringify(user),
+      });
+
+      return redirect(`${frontendUrl}/callback?${params.toString()}`);
     },
     {
       query: t.Object({
