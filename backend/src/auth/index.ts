@@ -4,7 +4,15 @@ import { generateState, OAuth2RequestError } from "arctic";
 import { github, getGitHubUser } from "./github";
 import db from "../db";
 
-const STATE_COOKIE = "github_oauth_state";
+const pendingStates = new Map<string, number>();
+const STATE_TTL = 10 * 60 * 1000; // 10 minutes
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [state, createdAt] of pendingStates) {
+    if (now - createdAt > STATE_TTL) pendingStates.delete(state);
+  }
+}, 5 * 60 * 1000);
 
 export const authPlugin = new Elysia({ prefix: "/auth" })
   .use(
@@ -15,18 +23,9 @@ export const authPlugin = new Elysia({ prefix: "/auth" })
     }),
   )
 
-  .get("/github", ({ cookie, redirect }) => {
+  .get("/github", ({ redirect }) => {
     const state = generateState();
-
-    const isProd = process.env.NODE_ENV === "production";
-    cookie[STATE_COOKIE].set({
-      value: state,
-      httpOnly: true,
-      sameSite: isProd ? "none" : "lax",
-      secure: isProd,
-      path: "/",
-      maxAge: 60 * 10,
-    });
+    pendingStates.set(state, Date.now());
 
     const url = github.createAuthorizationURL(state, ["user:email"]);
 
@@ -35,17 +34,20 @@ export const authPlugin = new Elysia({ prefix: "/auth" })
 
   .get(
     "/callback",
-    async ({ query, cookie, jwt: jwtHandler, set, redirect }) => {
+    async ({ query, jwt: jwtHandler, set, redirect }) => {
       const { code, state } = query;
 
-      const storedState = cookie[STATE_COOKIE].value;
-
-      if (!code || !state || state !== storedState) {
+      const createdAt = pendingStates.get(state);
+      if (!code || !state || createdAt === undefined) {
         set.status = 400;
         return { error: "Invalid OAuth state" };
       }
 
-      cookie[STATE_COOKIE].remove();
+      pendingStates.delete(state);
+      if (Date.now() - createdAt > STATE_TTL) {
+        set.status = 400;
+        return { error: "OAuth state expired" };
+      }
 
       let accessToken: string;
       try {
