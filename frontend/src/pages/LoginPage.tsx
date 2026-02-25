@@ -1,8 +1,16 @@
 import { Github } from "lucide-react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 export default function LoginPage() {
+  const { isAuthenticated } = useAuth();
+
+  if (isAuthenticated) {
+    return <Navigate to="/ranking" replace />;
+  }
+
   return (
     <div className="login-page">
       <div className="login-card">
