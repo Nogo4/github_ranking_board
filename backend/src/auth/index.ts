@@ -18,10 +18,12 @@ export const authPlugin = new Elysia({ prefix: "/auth" })
   .get("/github", ({ cookie, redirect }) => {
     const state = generateState();
 
+    const isProd = process.env.NODE_ENV === "production";
     cookie[STATE_COOKIE].set({
       value: state,
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: isProd ? "none" : "lax",
+      secure: isProd,
       path: "/",
       maxAge: 60 * 10,
     });
