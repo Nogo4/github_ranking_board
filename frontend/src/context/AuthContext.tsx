@@ -2,7 +2,6 @@ import {
   createContext,
   useContext,
   useState,
-  useEffect,
   type ReactNode,
 } from "react";
 import type { User } from "../types/api";
@@ -29,19 +28,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { token, user };
   });
 
-  useEffect(() => {
-    if (state.token) localStorage.setItem("token", state.token);
-    else localStorage.removeItem("token");
-
-    if (state.user) localStorage.setItem("user", JSON.stringify(state.user));
-    else localStorage.removeItem("user");
-  }, [state]);
-
   function login(token: string, user: User) {
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(user));
     setState({ token, user });
   }
 
   function logout() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
     setState({ token: null, user: null });
   }
 
