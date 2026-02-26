@@ -1,5 +1,5 @@
 const config = {
-  appName: "Ranking Board",
+  appName: "Workshop GIT",
 };
 
 export default config;
